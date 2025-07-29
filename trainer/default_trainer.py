@@ -4,6 +4,10 @@
 # Licensed under The MIT License [see LICENSE for details]
 # Modified by Xueyan Zou (xueyan@cs.wisc.edu)
 # --------------------------------------------------------
+#
+# Further modified by Osman Ülger (o.ulger@uva.nl) in 2025
+# Changed forward pass to use automatically generated vocabulary, rather than manually specified one.
+# --------------------------------------------------------
 
 from datetime import datetime
 import time
@@ -32,9 +36,10 @@ from .distributed_trainer import DistributedTrainer
 from .utils_trainer import UtilsTrainer
 from .utils.misc import *
 from .utils.serialization import JSONEncoder, filter_jsonable
+from X_Decoder.modeling.BaseModel import BaseModel
+from X_Decoder.modeling import build_model
 
 logger = logging.getLogger(__name__)
-
 
 class DefaultTrainer(UtilsTrainer, DistributedTrainer):
 
@@ -44,14 +49,14 @@ class DefaultTrainer(UtilsTrainer, DistributedTrainer):
         """
         super().__init__(opt)
         base_name = 'base_dir'
-        base_path =  os.path.join(self.opt['base_path'], '__init__.py')
+        base_path =  os.path.join(self.opt['BASE_PATH'], '__init__.py')
         spec = importlib.util.spec_from_file_location(base_name, base_path)
         module = importlib.util.module_from_spec(spec)
         sys.modules[base_name] = module
         spec.loader.exec_module(module)
-        logger.info(f"Imported {base_name} at base_path {self.opt['base_path']}")
+        logger.info(f"Imported {base_name} at base_path {self.opt['BASE_PATH']}")
 
-        pipeline_module = importlib.import_module(f"base_dir.pipeline.{self.opt['PIPELINE']}")
+        pipeline_module = importlib.import_module(f"base_dir.{self.opt['PIPELINE']}")
         pipeline_class = getattr(pipeline_module, self.opt['PIPELINE'])
         logger.info(f"Pipeline for training: {self.opt['PIPELINE']}")
         self.pipeline = pipeline_class(self.opt)
@@ -62,7 +67,11 @@ class DefaultTrainer(UtilsTrainer, DistributedTrainer):
         self.mode = "eval"
 
         # self.model_names, self.raw_models, self.criteria = self.pipeline.set_up_model()
-        self.raw_models = self.pipeline.initialize_model()
+        model_name = "default"
+        model = build_model(self.opt)
+        model.train()
+        self.raw_models = {model_name: BaseModel(self.opt, model)}
+        # self.raw_models = self.pipeline.initialize_model()
         self.model_names = self.raw_models.keys()
 
         # move models to the device
@@ -76,17 +85,21 @@ class DefaultTrainer(UtilsTrainer, DistributedTrainer):
         else:
             raise ValueError(f"Model not found: {model_path}")
 
-        results = self._eval_on_set(self.save_folder)
+        results = self._eval_on_set(self.input_folder, self.save_folder)
         return results
 
-    def _eval_on_set(self, save_folder):
+    def _eval_on_set(self, input_folder, save_folder):
         logger.info(f"Evaluation start ...")
         if self.opt['FP16']:
             from torch.cuda.amp import autocast
             with autocast():
-                results = self.pipeline.evaluate_model(self, save_folder)
-        else:        
-            results = self.pipeline.evaluate_model(self, save_folder)
+                results = self.pipeline.evaluate_model(self, input_folder, save_folder)
+        else:
+            if self.opt['PIPELINE'] == 'AutoSegXDecoderPipeline':
+                self.pipeline.inference(self, input_folder, save_folder)
+                results = None
+            else:
+                results = self.pipeline.evaluate_model(self, input_folder, save_folder)
         if self.opt['rank'] == 0:
             logger.info(results)
         return results

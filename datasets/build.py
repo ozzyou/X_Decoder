@@ -40,14 +40,14 @@ from .dataset_mappers import *
 from .evaluation import (InstanceSegEvaluator, 
                          ClassificationEvaluator, 
                          SemSegEvaluator, 
-                         RetrievalEvaluator, 
-                         CaptioningEvaluator, 
-                         COCOPanopticEvaluator,
-                         GroundingEvaluator,
-                         InteractiveEvaluator,
+                         # RetrievalEvaluator,
+                         # CaptioningEvaluator,
+                         # COCOPanopticEvaluator,
+                         # GroundingEvaluator,
+                         # InteractiveEvaluator,
 )
-from modeling.utils import configurable
-from utils.distributed import get_world_size
+from X_Decoder.modeling.utils import configurable
+from X_Decoder.utils.distributed import get_world_size
 
 class JointLoader(torchdata.IterableDataset):
     def __init__(self, loaders, key_dataset):
@@ -349,6 +349,9 @@ def get_config_from_name(cfg, dataset_name):
     elif 'voc' in dataset_name:
         cfg.update(cfg['VOC'])
         return cfg
+    elif 'autoseg' in dataset_name:
+        cfg.update(cfg['AUTOSEG'])
+        return cfg
     elif 'context' in dataset_name:
         cfg.update(cfg['CONTEXT'])
         return cfg
@@ -398,27 +401,27 @@ def get_config_from_name(cfg, dataset_name):
 def build_eval_dataloader(cfg, ):
     dataloaders = []
     for dataset_name in cfg['DATASETS']['TEST']:
-        cfg = get_config_from_name(cfg, dataset_name)
+        cfg_ = get_config_from_name(cfg, dataset_name)
         # adjust mapper according to dataset
         if dataset_name == 'imagenet_val':
-            mapper = ImageNetDatasetMapper(cfg, False)
+            mapper = ImageNetDatasetMapper(cfg_, False)
         elif dataset_name == 'bdd10k_val_sem_seg':
-            mapper = BDDSemDatasetMapper(cfg, False)
+            mapper = BDDSemDatasetMapper(cfg_, False)
         elif dataset_name in ["vlp_val", "vlp_captioning_val", "vlp_val2017", "vlp_captioning_val2017"]:
-            mapper = VLPreDatasetMapper(cfg, False, dataset_name)
+            mapper = VLPreDatasetMapper(cfg_, False, dataset_name)
         elif dataset_name in ["scannet_21_val_seg", "scannet_38_val_seg", "scannet_41_val_seg"]:
-            mapper = ScanNetSegDatasetMapper(cfg, False)
+            mapper = ScanNetSegDatasetMapper(cfg_, False)
         elif dataset_name in ["scannet_21_panoptic_val", 'bdd10k_40_panoptic_val']:
-            mapper = ScanNetPanoDatasetMapper(cfg, False)
+            mapper = ScanNetPanoDatasetMapper(cfg_, False)
         elif "pascalvoc_val" in dataset_name:
-            mapper = PascalVOCSegDatasetMapperIX(cfg, False, dataset_name)
+            mapper = PascalVOCSegDatasetMapperIX(cfg_, False, dataset_name)
         elif 'sun' in dataset_name:
-            mapper = SunRGBDSegDatasetMapper(cfg, False)
+            mapper = SunRGBDSegDatasetMapper(cfg_, False)
         elif 'refcoco' in dataset_name:
-            mapper = RefCOCODatasetMapper(cfg, False)
+            mapper = RefCOCODatasetMapper(cfg_, False)
         else:
             mapper = None
-        dataloaders += [build_detection_test_loader(cfg, dataset_name, mapper=mapper)]
+        dataloaders += [build_detection_test_loader(cfg_, dataset_name, mapper=mapper)]
     return dataloaders
 
 

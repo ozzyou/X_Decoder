@@ -4,6 +4,10 @@
 # Licensed under The MIT License [see LICENSE for details]
 # Modified by Xueyan Zou (xueyan@cs.wisc.edu)
 # --------------------------------------------------------
+#
+# Further modified by Osman Ülger (o.ulger@uva.nl) in 2025
+# Changed forward pass to use automatically generated vocabulary, rather than manually specified one.
+# --------------------------------------------------------
 
 import os
 import logging
@@ -46,6 +50,7 @@ class DistributedTrainer:
             adapter.init_process_group(backend='nccl')
 
         # save config file
+        self.input_folder = self.opt['INPUT_DIR']
         self.save_folder = self.opt['SAVE_DIR']
 
         if self.opt['world_size'] > 1:

@@ -16,7 +16,6 @@ from PIL import Image
 from detectron2.data import MetadataCatalog
 from detectron2.structures import BitMasks, Boxes, BoxMode, Keypoints, PolygonMasks, RotatedBoxes
 from detectron2.utils.file_io import PathManager
-
 from detectron2.utils.colormap import random_color
 
 logger = logging.getLogger(__name__)
@@ -442,6 +441,54 @@ class Visualizer:
             assigned_colors=colors,
             alpha=alpha,
         )
+        return self.output
+
+    def draw_sem_seg_avs(self, sem_seg, text_labels=None, area_threshold=None, alpha=0.7):
+        """
+        Draw semantic segmentation predictions/labels.
+
+        Args:
+            sem_seg (Tensor or ndarray): the segmentation of shape (H, W).
+                Each value is the integer label of the pixel.
+            area_threshold (int): segments with less than `area_threshold` are not drawn.
+            alpha (float): the larger it is, the more opaque the segmentations are.
+
+        Returns:
+            output (VisImage): image object with visualizations.
+        """
+        if isinstance(sem_seg, torch.Tensor):
+            sem_seg = sem_seg.numpy()
+        labels, areas = np.unique(sem_seg, return_counts=True)
+        sorted_idxs = np.argsort(-areas).tolist()
+        labels = labels[sorted_idxs]
+        a = {}
+
+        for l1, l2 in text_labels:
+            a[l1] = l2
+
+        for c, label in enumerate(filter(lambda l: l < len(self.metadata.thing_classes), labels)):
+            # print(self.metadata.stuff_colors[label])
+            # try:
+            #     mask_color = [x / 255 for x in self.metadata.stuff_colors[label]]
+            # except (AttributeError, IndexError):
+            #     mask_color = None
+            rng = np.random.RandomState(int(label))
+            mask_color = rng.rand(3).tolist()
+
+            # rgb = random_color2(label, max_value=255)
+            # mask_color = [c / 255 for c in rgb]
+
+            binary_mask = (sem_seg == label).astype(np.uint8)
+            text = a[label]
+
+            self.draw_binary_mask(
+                binary_mask,
+                color=mask_color,
+                edge_color=_OFF_WHITE,
+                text=text,
+                alpha=alpha,
+                area_threshold=area_threshold,
+            )
         return self.output
 
     def draw_sem_seg(self, sem_seg, area_threshold=None, alpha=0.7):
